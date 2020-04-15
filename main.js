@@ -52,6 +52,7 @@ var smtpdata = async function(stream, session, callback)
 	var mailobj = await SimpleMailParser(stream, {}).catch(callback);
 	if(!mailobj)
 	{
+		stream.end();
 		return;
 	}
 	
@@ -71,6 +72,7 @@ var smtpdata = async function(stream, session, callback)
 	if(!await ok(fs.promises.mkdir(mailboxdir, {recursive: true})).catch(callback))
 	{
 		console.log('error: mkdir failed for: ' + mailboxdir);
+		stream.end();
 		return;
 	}
 	
@@ -83,6 +85,7 @@ var smtpdata = async function(stream, session, callback)
 			// write binary data separately from JSON, to keep JSON small to parse
 			if(!await storeFile(fileID + '.attachments.' + i + '.bin', mailobj.attachments[i].content, 'binary').catch(callback))
 			{
+				stream.end();
 				return;
 			}
 			delete mailobj.attachments[i].content;
@@ -91,6 +94,7 @@ var smtpdata = async function(stream, session, callback)
 		}
 		if(!await storeFile(fileID + '.attachments.json', JSON.stringify(mailobj.attachments)).catch(callback))
 		{
+			stream.end();
 			return;
 		}
 		delete mailobj.attachments;
@@ -98,6 +102,7 @@ var smtpdata = async function(stream, session, callback)
 	
 	if(!await storeFile(fileID + '.body.json', JSON.stringify({html: mailobj.html, text: mailobj.text, textAsHtml: mailobj.textAsHtml})).catch(callback))
 	{
+		stream.end();
 		return;
 	}
 	delete mailobj.html;
@@ -106,9 +111,11 @@ var smtpdata = async function(stream, session, callback)
 	
 	if(!await storeFile(fileID + '.mail.json', JSON.stringify(mailobj)).catch(callback))
 	{
+		stream.end();
 		return;
 	}
 	
+	stream.end();
 	callback(false);
 };
 var smtpclose = function()
