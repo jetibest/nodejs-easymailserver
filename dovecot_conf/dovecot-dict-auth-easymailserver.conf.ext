@@ -1,0 +1,40 @@
+# Dictionary URI
+uri = fs:posix:prefix=/var/vmail/
+
+# Default password scheme (PLAIN MD5 ...)
+default_pass_scheme = PLAIN
+
+# Username iteration prefix. Keys under this are assumed to contain usernames.
+iterate_prefix = %Ld/
+
+# Should iteration be disabled for this userdb? If this userdb acts only as a
+# cache there's no reason to try to iterate the (partial & duplicate) users.
+iterate_disable = no
+
+# Define some dictionary data:
+key password {
+  key = %Ld/%Ln/password
+  format = value
+}
+key quota {
+  key = %Ld/%Ln/quota
+  format = value
+  # The default_value is used if the key isn't found. If default_value setting
+  # isn't specified at all (even as empty), the passdb/userdb lookup fails with
+  # "user doesn't exist".
+  default_value = 100M
+}
+
+# Return userdb and passdb fields:
+userdb_fields {
+  quota_rule = *:storage=%{dict:quota}
+  uid = vmail
+  gid = vmail
+  home = /var/vmail/%Ld/%Ln
+  # See doc/wiki/Variables.txt for full list.
+  # <doc/wiki/MailLocation.txt>
+  mail = maildir:/var/vmail/%Ld/%Ln
+}
+passdb_fields {
+  password = %T{dict:password}
+}

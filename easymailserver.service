@@ -1,0 +1,30 @@
+[Unit]
+Description=Easymailserver MTA implementing the SMTP protocol
+
+# Restart indefinitely if easymailserver exited:
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+
+User=vmail
+Group=vmail
+
+# See: https://man7.org/linux/man-pages/man7/capabilities.7.html
+# CAP_NET_BIND_SERVICE: Bind a socket to Internet domain privileged ports
+# (port numbers less than 1024).
+# Required to listen on SMTP port :25
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+WorkingDirectory=/srv/easymailserver
+ExecStart=/srv/easymailserver/easymailserver.sh
+
+Restart=always
+RestartSec=10
+# Note: if latest version of systemd, remove RestartSec above, and uncomment
+# lines below (see also https://github.com/systemd/systemd/pull/26902):
+# RestartSteps=10
+# RestartSecMax=900
+
+[Install]
+WantedBy=multi-user.target

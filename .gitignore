@@ -1,1 +1,12 @@
-config.json
+package-lock.json
+queue/
+node_modules/
+config/host_list
+config/me
+config/internalcmd_key
+config/*.pem
+config/dkim/*
+!config/dkim/dkim_key_gen.sh
+trash/
+nvm/
+client/
