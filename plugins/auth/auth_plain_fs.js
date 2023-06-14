@@ -111,6 +111,7 @@ exports.hook_capabilities = function(next, connection)
 	if(!connection.remote.is_private && !connection.tls.enabled)
 	{
 		plugin.loginfo('Auth disabled for insecure public connection', connection);
+		plugin.loginfo(connection.tls, connection);
 		return next();
 	}
 	
@@ -136,7 +137,18 @@ exports.hook_capabilities = function(next, connection)
 exports.get_plain_passwd = async function(username, connection, cb)
 {
 	const plugin = this;
-	const username_addr = new Address(username);
+	var username_addr = null;
+	try
+	{
+		username_addr = new Address(username);
+	}
+	catch(err)
+	{
+		plugin.logdebug('Failed (' + err + ') to parse username (' + username + ') in get_plain_passwd.', connection);
+		
+		// returning undefined
+		return cb();
+	}
 
 	const config = plugin.cfg[username] || plugin.cfg[username_addr.host] || plugin.cfg.main;
 	

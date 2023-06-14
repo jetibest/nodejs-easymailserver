@@ -5,6 +5,7 @@ config/host_list
 config/me
 config/internalcmd_key
 config/*.pem
+config/tls/
 config/dkim/*
 !config/dkim/dkim_key_gen.sh
 trash/

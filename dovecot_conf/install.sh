@@ -6,7 +6,7 @@ then
 	exit 1
 fi
 
-if ! [ -e 90-auth-easymailserver.conf ]
+if ! [ -e 90-easymailserver.conf ]
 then
 	echo "error: Execute this install script from within the directory it exists in." >&2
 	echo "Like so:" >&2
@@ -16,7 +16,7 @@ then
 	exit 1
 fi
 
-cp -v 90-auth-easymailserver.conf /etc/dovecot/conf.d/
+cp -v 90-easymailserver.conf /etc/dovecot/conf.d/
 cp -v dovecot-dict-auth-easymailserver.conf.ext /etc/dovecot/
 
 # this assumes that /etc/dovecot/dovecot.conf contains a line with:
