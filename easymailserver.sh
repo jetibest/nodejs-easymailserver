@@ -1,5 +1,7 @@
 #!/bin/bash
 
+STABLE_NODE_VERSION="lts/gallium"
+
 # EasyMailServer script
 # 
 # easymailserver.sh ensures (= it can be safely run multiple times):
@@ -13,32 +15,22 @@
 
 set -e # automatically exit if any command fails
 
-# detect if we need to install a later version of NodeJS (minimally required is v16)
-need_stable_node=true
-
 node_command="node"
 if ! command -v "$node_command" >/dev/null 2>/dev/null
 then
 	node_command="nodejs"
 fi
-if command -v "$node_command" >/dev/null 2>/dev/null
-then
-	# check version
-	node_version="$($node_command --version | sed -e 's/^v//g' -e 's/[.].*//g')"
-	if [ "$node_version" -ge "16" ]
-	then
-		need_stable_node=false
-	fi
-fi
 
-if $need_stable_node
+if ! ./install.sh node
 then
+	echo "Haraka requires NodeJS v16 or higher as a dependency."
+	
 	# try to source nvm if exists
 	if [ -e nvm/nvm.sh ]
 	then
 		. nvm/nvm.sh
-	fi
-	if [ -e ~/.nvm/nvm.sh ]
+		
+	elif [ -e ~/.nvm/nvm.sh ]
 	then
 		. ~/.nvm/nvm.sh
 	fi
@@ -46,12 +38,15 @@ then
 	# if nvm is installed, use it to set NodeJS version to stable, or latest (this is useful for systems with an old native version of NodeJS)
 	if command -v nvm >/dev/null 2>/dev/null
 	then
-		if ! nvm use stable
+		if ! nvm use "$STABLE_NODE_VERSION"
 		then
 			echo "Run ./install.sh"
+			exit 1
 		fi
 	fi
 fi
+
+echo "Node version $($node_command -v)"
 
 # ensure we are in the right local working directory (easymailserver/)
 if ! [ -e easymailserver.sh ]
@@ -72,7 +67,7 @@ fi
 if ! [ -e config/internalcmd_key ]
 then
 	echo "[easymailserver.sh] Automatically generating missing config/internalcmd_key..." >&2
-	node -e 'fs.writeFile("config/internalcmd_key", crypto.randomBytes(32).toString("hex"));'
+	$node_command -e 'fs.writeFileSync("config/internalcmd_key", crypto.randomBytes(32).toString("hex"));'
 fi
 
 # automatically set default
@@ -92,7 +87,7 @@ then
 fi
 
 # setup a default certificate for our current hostname
-if ! [ -e config/tls_key.pem ] && ! [ config/tls_cert.pem ]
+if ! [ -e config/tls_key.pem ] && ! [ -e config/tls_cert.pem ]
 then
 	echo "[easymailserver.sh] Automatically generating missing TLS-certificate..." >&2
 	openssl req -x509 -nodes -days 356000 -newkey rsa:2048 -keyout config/tls_key.pem -out config/tls_cert.pem -subj "/CN=$(head -n1 config/me)"
@@ -131,7 +126,7 @@ then
 	
 	first=true
 	
-	node -e '
+	$node_command -e '
 (async function()
 {
 const haraka_config = require("'"$haraka_config_require"'");
@@ -142,11 +137,15 @@ const host_path_dir = path.dirname(host_path_norm);
 const host_path_parts = path.basename(host_path_norm).split("<domain>");
 
 var hostnames = await fs.promises.readdir(host_path_dir);
+
+// filter out invalid/hidden directories
+hostnames = hostnames.filter(hostname => hostname && !hostname.startsWith("."));
+
 if(host_path_parts.length === 2)
 {
 	var prefix = host_path_parts[0];
 	var suffix = host_path_parts[1];
-
+	
 	if(prefix.length > 0) hostnames = hostnames.filter(file => file.startsWith(prefix));
 	if(suffix.length > 0) hostnames = hostnames.filter(file => file.endsWith(suffix));
 	
@@ -158,13 +157,13 @@ else if(host_path_parts.length > 2)
 	process.stderr.write("[easymailserver.sh] Error: Syntax error in config/rcpt_to.host_fs.ini (multiple <domain> in the same directory name is not allowed), for line: " + host_path + "\n");
 	process.exit(1);
 }
-process.stdout.write(hostnames.join("\n"));
+process.stdout.write(hostnames.join("\n") + "\n");
 })();
 ' | while IFS= read -r hostname
 	do
+		# only go to config/dkim after node is initialized (because require needs the original working directory)
 		if $first
 		then
-			# move to the config/dkim directory
 			first=false
 			cd config/dkim
 		fi

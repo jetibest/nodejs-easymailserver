@@ -1,5 +1,9 @@
 #!/bin/bash
 
+STABLE_NODE_VERSION="lts/gallium"
+EMAIL_USER="vmail"
+EMAIL_GROUP="vmail"
+
 # EasyMailServer install script
 # 
 # install.sh ensures (= it can be safely run multiple times):
@@ -18,134 +22,135 @@ then
 	exit 1
 fi
 
-user="$(whoami)"
-
-# check who is the user running this script
-if [ "$user" != "vmail" ]
-then
-	echo "WARNING:" >&2
-	read -p "This script will install easymailserver for user: '$(whoami)'. Are you certain this is the user that will be running the easymailserver-service? <y/[n]> " answer
-	
-	echo "" >&2
-	
-	case "$answer" in
-		[Yy]*) ;;
-		*)
-			echo "Exiting as per user decision. You should probably try to re-run this script as the user that will be running the easymailserver-service." >&2
-			echo "Try:" >&2
-			echo "" >&2
-			echo "  su -s /bin/sh -c ./install.sh vmail" >&2
-			echo "" >&2
-			exit 1
-			;;
-	esac
-fi
-
-# grab the current working directory
 wd="$(pwd)"
 
-owner="$(ls -ld "$wd" | awk '{print $3}')"
-if [ "$owner" != "$user" ]
+if [ "$1" = "node" ]
 then
-	echo "The owner of $wd is not set to $user" >&2
-	echo "Set the correct permissions using:" >&2
-	echo "" >&2
-	echo "  chown -R $user "'"'"$wd"'"'"" >&2
-	echo "" >&2
-	exit 1
-fi
-
-# use -g for a global Haraka install, if left out, Haraka will be installed locally (default)
-npm_install_flags=("$@")
-
-# detect if we need to install a later version of NodeJS (minimally required is v16)
-do_node_install=true
-
-node_command="node"
-if ! command -v "$node_command" >/dev/null 2>/dev/null
-then
-	node_command="nodejs"
-fi
-if command -v "$node_command" >/dev/null 2>/dev/null
-then
-	# check version
-	node_version="$($node_command --version | sed -e 's/^v//g' -e 's/[.].*//g')"
-	if [ "$node_version" -ge "16" ]
-	then
-		do_node_install=false
-	fi
-fi
-
-if ! command -v "npm" >/dev/null 2>/dev/null
-then
-	echo "In order to install, we require npm (the NodeJS Package Manager) to be installed." >&2
-fi
-
-if $do_node_install
-then
-	echo "Haraka requires NodeJS v16 or higher as a dependency." >&2
+	# detect if we need to install a later version of NodeJS (minimally required is v16)
+	do_node_install=true
 	
-	# load nvm if not yet loaded
-	if ! command -v "nvm" >/dev/null 2>/dev/null
+	node_command="node"
+	if ! command -v "$node_command" >/dev/null 2>/dev/null
 	then
-		if [ -e ~/.nvm/nvm.sh ]
+		node_command="nodejs"
+	fi
+	if command -v "$node_command" >/dev/null 2>/dev/null
+	then
+		# check version
+		node_version="$($node_command --version | sed -e 's/^v//g' -e 's/[.].*//g')"
+		if [ "$node_version" -ge "16" ]
 		then
-			. ~/.nvm/nvm.sh
-		else
-			# install nvm if not yet installed
-			if ! [ -e nvm ]
-			then
-				echo "Automatically installing nvm from github repo (https://github.com/nvm-sh/nvm.git) into nvm/" >&2
-				
-				# download .nvm source code
-				git clone https://github.com/nvm-sh/nvm.git nvm
-				
-				# select the right version
-				cd nvm
-				git checkout "$(git tag -l --sort=-taggerdate | head -n1)"
-				
-				# go back to the original working directory
-				cd "$wd"
-			else
-				echo "Existing installation of nvm found at ~/.nvm/" >&2
-			fi
-			
-			# import nvm to start using it
-			. nvm/nvm.sh
+			# version is at least v16, which good enough
+			exit 0
 		fi
 	fi
 	
-	if ! nvm use stable >/dev/null 2>/dev/null
+	# currently available NodeJS version is not good enough
+	exit 1
+
+elif [ "$1" = "nvm" ]
+then
+	# load nvm if not yet loaded
+	if ! command -v "nvm" >/dev/null 2>/dev/null || ! nvm list >/dev/null 2>/dev/null
 	then
-		echo "No stable installation of NodeJS found in nvm, automatically installing stable version of NodeJS..." >&2
+		if ! [ -e nvm/nvm.sh ]
+		then
+			# install nvm if not yet installed
+			echo "Automatically installing nvm from github repo (https://github.com/nvm-sh/nvm.git) into nvm/" >&2
+			
+			# download .nvm source code
+			git clone https://github.com/nvm-sh/nvm.git nvm
+			
+			# select the right version
+			cd nvm
+			#git checkout "$(git tag -l --sort=-taggerdate | head -n1)"
+			git checkout `git describe --abbrev=0 --tags --match "v[0-9]*" $(git rev-list --tags --max-count=1)`
+			
+			# go back to the original working directory
+			cd "$wd"
+		fi
+		
+		# import nvm to start using it
+		. nvm/nvm.sh
+	fi
+	
+	if ! nvm use "$STABLE_NODE_VERSION" >/dev/null 2>/dev/null
+	then
+		echo "No LTS installation of NodeJS found in nvm, automatically installing LTS version of NodeJS..." >&2
 		
 		# install the stable version of node
-		nvm install stable
+		nvm install "$STABLE_NODE_VERSION"
 	fi
 	
 	# use stable version of node
-	nvm use stable
+	nvm use "$STABLE_NODE_VERSION"
+	
+	exit 0
+
+elif [ "$1" = "npm" ]
+then
+	# try to source nvm if exists
+	if [ -e nvm/nvm.sh ]
+	then
+		. nvm/nvm.sh
+		
+	elif [ -e ~/.nvm/nvm.sh ]
+	then
+		. ~/.nvm/nvm.sh
+	fi
+	
+	# if nvm is installed, use it to set NodeJS version to stable, or latest (this is useful for systems with an old native version of NodeJS)
+	if command -v nvm >/dev/null 2>/dev/null
+	then
+		if ! nvm use "$STABLE_NODE_VERSION"
+		then
+			echo "Run ./install.sh"
+			exit 1
+		fi
+	fi
+	
+	npm install
+	
+	exit 0
 fi
 
-# install local package.json packages
-echo "Ensuring packages from package.json are installed..." >&2
-npm install
-echo "" >&2
-
 # create vmail user and group, and initialize the default directory
-vmail_dir="$(realpath vmail)"
-if ! id vmail >/dev/null 2>/dev/null
+vmail_dir="$(realpath "./vmail")"
+if ! id "$EMAIL_USER" >/dev/null 2>/dev/null
 then
 	echo "Creating user and group for vmail (with home directory at $vmail_dir)..." >&2
-	groupadd -g 5000 vmail
-	useradd -M -d "$vmail_dir" -s /bin/false -u 5000 -g vmail vmail
+	groupadd -g 5000 "$EMAIL_GROUP"
+	useradd -M -d "$vmail_dir" -s /bin/false -u 5000 -g "$EMAIL_GROUP" "$EMAIL_USER"
 fi
 if ! [ -e "$vmail_dir" ]
 then
 	echo "Creating vmail directory ($vmail_dir)..." >&2
 	mkdir "$vmail_dir"
-	chown vmail:vmail "$vmail_dir"
 fi
+
+# fix permissions in this current working directory
+chown -R "$EMAIL_USER":"$EMAIL_GROUP" .
+# and in the vmail directory
+chown -R "$EMAIL_USER":"$EMAIL_GROUP" "$vmail_dir"
+
+
+if ! command -v "npm" >/dev/null 2>/dev/null
+then
+	echo "In order to continue installation, we require npm (the NodeJS Package Manager) to be installed." >&2
+	exit 1
+fi
+
+if ! su - -s /bin/sh -c "cd '$wd' && ./install.sh node" "$EMAIL_USER"
+then
+	echo "Haraka requires NodeJS v16 or higher as a dependency." >&2
+	
+	su - -s /bin/sh -c "cd '$wd' && ./install.sh nvm" "$EMAIL_USER"
+fi
+
+# install local package.json packages
+echo "Ensuring packages from package.json are installed..." >&2
+su - -s /bin/sh -c "cd '$wd' && ./install.sh npm" "$EMAIL_USER"
+echo "" >&2
 
 # enable the easymailserver-service
 if command -v systemctl >/dev/null 2>/dev/null
@@ -167,7 +172,7 @@ then
 		
 		echo "First enable the easymailserver service:" >&2
 		echo "" >&2
-		echo "  systemctl enable '$(pwd)/easymailserver.service'" >&2
+		echo "  systemctl enable '$wd/easymailserver.service'" >&2
 		echo "" >&2
 	fi
 	
@@ -184,7 +189,7 @@ else
 	echo "" >&2
 	echo "Note that when running easymailserver, the working directory should be:" >&2
 	echo "" >&2
-	echo "  $(pwd)" >&2
+	echo "  $wd" >&2
 	echo "" >&2
 	exit 1
 fi
