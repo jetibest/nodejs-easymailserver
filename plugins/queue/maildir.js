@@ -237,6 +237,7 @@ exports.hook_queue = async function(next, connection)
 						plugin.loginfo('hook_queue: Recipient (' + p.recipient + ') does not exist, catch all to: ' + catch_all_subpath, connection);
 
 						p.maildir = catch_all_path;
+						p.maildir_sub = catch_all_subpath;
 						p.maildir_tmp = path.join(catch_all_subpath, 'tmp');
 						p.maildir_new = path.join(catch_all_subpath, 'new');
 						p.maildir_tmp_file = path.join(catch_all_subpath, 'tmp', unique_filename);
