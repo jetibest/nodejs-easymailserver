@@ -6,6 +6,7 @@ node_modules/
 /config/internalcmd_key
 /config/*.pem
 /config/tls/
+/config/tls-old/
 /config/dkim/*
 !/config/dkim/dkim_key_gen.sh
 /trash/
